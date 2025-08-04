@@ -1,0 +1,34 @@
+[
+    {
+        "id": 1,
+        "name": "Bej Keten Gömlek",
+        "price": "899.99 TL",
+        "image": "static/img/gomlek1.webp",
+        "style_tags": ["bohem", "klasik", "minimalist", "günlük"],
+        "color_tags": ["bej", "krem", "toprak"]
+    },
+    {
+        "id": 2,
+        "name": "Siyah Chino Pantolon",
+        "price": "1299.90 TL",
+        "image": "static/img/pantolon1.webp",
+        "style_tags": ["klasik", "modern", "ofis", "minimalist"],
+        "color_tags": ["siyah", "antrasit", "koyu"]
+    },
+    {
+        "id": 3,
+        "name": "Beyaz Deri Sneaker",
+        "price": "2499.00 TL",
+        "image": "static/img/ayakkabi1.jpeg",
+        "style_tags": ["spor", "günlük", "modern", "minimalist"],
+        "color_tags": ["beyaz", "krem"]
+    },
+    {
+        "id": 4,
+        "name": "Zümrüt Yeşili Saten Elbise",
+        "price": "1899.50 TL",
+        "image": "static/img/elbise1.jpeg",
+        "style_tags": ["şık", "gece", "özel gün", "klasik"],
+        "color_tags": ["yeşil", "zümrüt", "koyu yeşil"]
+    }
+]

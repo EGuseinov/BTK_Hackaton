@@ -1,0 +1,47 @@
+{% extends 'layout.html' %}
+{% block title %}Siparişlerim{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Siparişlerim</h1>
+<div class="list-group">
+    {% for order in orders %}
+    <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+        <div>
+            <h5 class="mb-1">{{ order.product }}</h5>
+            <p class="mb-1">Sipariş No: {{ order.id }}</p>
+            <small>Durum: {{ order.status }}</small>
+        </div>
+        <button class="btn btn-outline-danger return-btn" 
+                data-bs-toggle="modal" 
+                data-bs-target="#return-chatbot-modal" 
+                data-product-name="{{ order.product }}">
+            İade Et
+        </button>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ReturnLogic Chatbot Modal -->
+<div class="modal fade" id="return-chatbot-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">🌀 Akıllı İade Asistanı (ReturnLogic)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="chat-window" class="chat-window mb-3">
+                    <!-- Mesajlar buraya eklenecek -->
+                </div>
+                <div id="chat-typing-indicator" class="d-none">
+                    <small class="text-muted">Asistan yazıyor...</small>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="chat-input" class="form-control" placeholder="Mesajınızı yazın...">
+                    <button id="chat-send-btn" class="btn btn-primary">Gönder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

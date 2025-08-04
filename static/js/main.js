@@ -21,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Bir hata oluştu.');
+                    // FastAPI hata mesajını 'detail' anahtarıyla gönderir
+                    throw new Error(data.detail || 'Bir hata oluştu.');
                 }
 
                 displayResults(data);
@@ -87,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
             productName = event.relatedTarget.getAttribute('data-product-name');
             chatWindow.innerHTML = '';
             addMessageToChat(`Merhaba! \"${productName}\" ürününü iade etme sebebinizi kısaca öğrenebilir miyim?`, 'bot');
+            chatInput.value = ''; // Inputu temizle
         });
         
         // Gönder butonuna tıklandığında
@@ -95,6 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Enter'a basıldığında
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 sendChatMessage();
             }
         });
@@ -115,9 +118,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     body: JSON.stringify({ message: message, product: productName })
                 });
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Chatbot ile iletişim kurulamadı.');
+                }
+                
                 addMessageToChat(data.reply, 'bot');
+
             } catch (error) {
-                addMessageToChat('Üzgünüm, şu anda size yardımcı olamıyorum. Lütfen daha sonra tekrar deneyin.', 'bot');
+                addMessageToChat(`Üzgünüm, bir hata oluştu: ${error.message}. Lütfen daha sonra tekrar deneyin.`, 'bot');
             } finally {
                 document.getElementById('chat-typing-indicator').classList.add('d-none');
             }

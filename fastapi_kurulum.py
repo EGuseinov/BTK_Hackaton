@@ -1,151 +1,122 @@
 import os
+import sys
 
 # Proje yapısı: Klasörler ve içerecekleri dosyalar
 PROJECT_STRUCTURE = {
     ".env": "# .env dosyası\nGEMINI_API_KEY=\"BURAYA_API_ANAHTARINIZI_YAPISTIRIN\"",
-    
-    "requirements.txt": """Flask
-google-generativeai
+
+    "requirements.txt": """fastapi
+uvicorn[standard]
 python-dotenv
+google-generativeai
 Pillow
+jinja2
+python-multipart
 """,
-    
-    "app.py": """import os
+
+    "main.py": """import os
 import json
-import google.generativeai as genai
-from flask import Flask, render_template, request, jsonify
+from fastapi import FastAPI, Request, File, UploadFile, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from dotenv import load_dotenv
-from PIL import Image
+
+# Yeni eklenen modüller
+from services import gemini_service
+from models.chat_models import ChatRequest, ChatResponse
 
 # .env dosyasındaki API anahtarını yükle
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+if not os.getenv("GEMINI_API_KEY"):
+    print("UYARI: GEMINI_API_KEY .env dosyasında bulunamadı veya boş. Lütfen API anahtarınızı ekleyin.")
 
-app = Flask(__name__)
+app = FastAPI(title="StilDöngüsü API")
+
+# Static dosyaları (css, js, img) ve templates klasörünü bağla
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
 
 # Ürün veritabanını yükle
 with open('products.json', 'r', encoding='utf-8') as f:
     products_db = json.load(f)
 
-# Gemini Modellerini Başlat
-vision_model = genai.GenerativeModel('gemini-1.5-pro-latest')
-text_model = genai.GenerativeModel('gemini-pro')
+# --- Sayfa Rotaları (HTML Döndürenler) ---
 
-# --- Sayfa Rotaları ---
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
 
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/siparislerim')
-def siparislerim():
-    # Demo sipariş verisi
+@app.get("/siparislerim", response_class=HTMLResponse)
+async def read_siparislerim(request: Request):
     dummy_orders = [
         {"id": "TR12345", "product": "Lacivert Blazer Ceket", "status": "Teslim Edildi"},
         {"id": "TR67890", "product": "Beyaz Gömlek", "status": "Teslim Edildi"}
     ]
-    return render_template('siparislerim.html', orders=dummy_orders)
+    return templates.TemplateResponse("siparislerim.html", {"request": request, "orders": dummy_orders})
 
-@app.route('/satici-paneli')
-def satici_paneli():
-    # Bu rapor, gerçek bir senaryoda toplanan verilerle periyodik olarak Gemini'ye ürettirilir.
-    # Hackathon için demo amaçlı statik içerik gösteriyoruz.
-    return render_template('satici_paneli.html')
+@app.get("/satici-paneli", response_class=HTMLResponse)
+async def read_satici_paneli(request: Request):
+    return templates.TemplateResponse("satici_paneli.html", {"request": request})
 
-# --- API Rotaları ---
 
-@app.route('/api/analyze-style', methods=['POST'])
-def analyze_style():
-    if 'file' not in request.files:
-        return jsonify({"error": "Resim dosyası bulunamadı"}), 400
+# --- API Rotaları (JSON Döndürenler) ---
 
-    file = request.files['file']
-    img = Image.open(file.stream)
+@app.post("/api/analyze-style")
+async def analyze_style_api(file: UploadFile = File(...)):
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Lütfen bir resim dosyası yükleyin.")
 
     try:
-        # Gemini Vision'a gönderilecek prompt
-        prompt = '''
-        Bu resimdeki giysi veya mobilyayı analiz et. 
-        Bana aşağıdaki formatta bir JSON çıktısı ver:
-        {
-          "item_description": "Örnek: Lacivert, yünlü, slim-fit bir blazer ceket",
-          "style_tags": ["klasik", "minimalist", "ofis"],
-          "color_tags": ["lacivert", "koyu mavi", "mavi"],
-          "dominant_color_name": "lacivert"
-        }
-        Sadece JSON kodunu döndür, başka hiçbir metin ekleme.
-        '''
-        response = vision_model.generate_content([prompt, img])
+        image_bytes = await file.read()
         
-        # Gemini'den gelen yanıtı temizleyip JSON'a çevir
-        analysis_json_text = response.text.strip().replace("```json", "").replace("```", "")
-        analysis_data = json.loads(analysis_json_text)
+        # Analiz mantığını service dosyasına taşıdık
+        analysis_data = gemini_service.analyze_image_style(image_bytes)
         
-        # Ürün veritabanında uyumlu ürünleri bul
-        matched_products = []
-        style_tags = set(analysis_data.get("style_tags", []))
-        color_tags = set(analysis_data.get("color_tags", []))
+        # Eşleşen ürünleri bul
+        matched_products = gemini_service.find_matching_products(analysis_data, products_db)
         
-        for product in products_db:
-            product_style_tags = set(product.get("style_tags", []))
-            # Basit bir eşleştirme mantığı: En az bir stil etiketi eşleşiyorsa uyumlu kabul et
-            if style_tags.intersection(product_style_tags):
-                matched_products.append(product)
-
         if not matched_products:
-            return jsonify({"error": "Veritabanımızda bu stile uygun ürün bulamadık."}), 404
-        
-        # Uyumlu ürünler için Gemini'den stil önerisi al
-        style_prompt = f\"\"\"
-        Bir kullanıcı dolabındaki '{analysis_data.get('item_description')}' için kombin önerisi arıyor.
-        Ona uyumlu olarak şu ürünleri bulduk: {[p['name'] for p in matched_products]}.
-        Bu ürünlerle ana parçanın neden şık duracağını anlatan, samimi ve ikna edici bir stil önerisi metni yaz.
-        Metin, kullanıcıya ilham vermeli ve bu ürünleri satın almaya teşvik etmeli.
-        \"\"\"
-        style_advice_response = text_model.generate_content(style_prompt)
+             raise HTTPException(status_code=404, detail="Veritabanımızda bu stile uygun ürün bulamadık.")
 
-        return jsonify({
+        # Stil önerisi al
+        style_advice_text = gemini_service.get_style_advice(
+            analysis_data.get('item_description'),
+            matched_products
+        )
+
+        return {
             "original_item": analysis_data,
-            "style_advice": style_advice_response.text,
+            "style_advice": style_advice_text,
             "matched_products": matched_products
-        })
+        }
 
+    except HTTPException as e:
+        # Kendi yarattığımız HTTP hatalarını doğrudan yolla
+        raise e
     except Exception as e:
-        print(f"Hata: {e}")
-        return jsonify({"error": "Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin."}), 500
+        print(f"Sunucu Hatası: {e}", file=sys.stderr)
+        # Diğer tüm beklenmedik hatalar için
+        raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu. Detaylar için sunucu loglarına bakın.")
 
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
-    data = request.json
-    user_message = data.get("message")
-    
-    # Gemini'ye iade asistanı rolünü ve görevini veriyoruz
-    system_prompt = \"\"\"
-    Sen, 'StilDöngüsü' adlı bir e-ticaret sitesinin 'Akıllı İade Asistanı'sın. Adın 'ReturnLogic'. 
-    Görevin, müşterinin iade sebebini nazikçe anlamak ve mümkünse ona bir çözüm sunarak iadeyi engellemek.
-    - Eğer sorun beden veya renk/stil uyumsuzluğu ise, iadeyi başlatabileceğini söyle ama hemen ardından ona 'Stil ve Uyum Analisti (StyleSync)' özelliğimizi öner. Bu özelliğin, elindeki başka bir parçanın fotoğrafını yükleyerek ona %100 uyumlu ürünler bulabileceğini anlat. Müşteriyi ana sayfaya yönlendirmek için '[STIL_ANALISTI_LINK]' metnini kullan.
-    - Eğer ürün bozuksa veya farklı bir sorun varsa, üzgün olduğunu belirt ve iade sürecinin başlatılacağını söyle.
-    - Konuşmaların kısa, samimi ve çözüm odaklı olsun.
-    \"\"\"
-
+@app.post("/api/chat", response_model=ChatResponse)
+async def chat_api(chat_request: ChatRequest):
     try:
-        response = text_model.generate_content([system_prompt, f"Müşteri: {user_message}"])
-        return jsonify({"reply": response.text})
+        # Chatbot mantığını service dosyasına taşıdık
+        reply = gemini_service.get_chatbot_reply(chat_request.message)
+        return ChatResponse(reply=reply)
     except Exception as e:
-        print(f"Chatbot Hatası: {e}")
-        return jsonify({"reply": "Sistemde bir sorun oluştu, lütfen daha sonra tekrar deneyin."}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        print(f"Chatbot Sunucu Hatası: {e}", file=sys.stderr)
+        raise HTTPException(status_code=500, detail="Chatbot servisinde bir hata oluştu.")
 """,
-    
+
     "products.json": """[
     {
         "id": 1,
         "name": "Bej Keten Gömlek",
         "price": "899.99 TL",
-        "image": "static/img/gomlek1.jpg",
+        "image": "static/img/gomlek1.webp",
         "style_tags": ["bohem", "klasik", "minimalist", "günlük"],
         "color_tags": ["bej", "krem", "toprak"]
     },
@@ -153,7 +124,7 @@ if __name__ == '__main__':
         "id": 2,
         "name": "Siyah Chino Pantolon",
         "price": "1299.90 TL",
-        "image": "static/img/pantolon1.jpg",
+        "image": "static/img/pantolon1.webp",
         "style_tags": ["klasik", "modern", "ofis", "minimalist"],
         "color_tags": ["siyah", "antrasit", "koyu"]
     },
@@ -161,7 +132,7 @@ if __name__ == '__main__':
         "id": 3,
         "name": "Beyaz Deri Sneaker",
         "price": "2499.00 TL",
-        "image": "static/img/ayakkabi1.jpg",
+        "image": "static/img/ayakkabi1.jpeg",
         "style_tags": ["spor", "günlük", "modern", "minimalist"],
         "color_tags": ["beyaz", "krem"]
     },
@@ -169,11 +140,99 @@ if __name__ == '__main__':
         "id": 4,
         "name": "Zümrüt Yeşili Saten Elbise",
         "price": "1899.50 TL",
-        "image": "static/img/elbise1.jpg",
+        "image": "static/img/elbise1.jpeg",
         "style_tags": ["şık", "gece", "özel gün", "klasik"],
         "color_tags": ["yeşil", "zümrüt", "koyu yeşil"]
     }
 ]""",
+
+    "services": {
+        "gemini_service.py": """import os
+import json
+import google.generativeai as genai
+from PIL import Image
+import io
+import sys
+
+# API anahtarı main.py'de yapılandırıldığı için burada tekrar çağırmaya gerek yok
+# Ancak yine de servisin tek başına çalışabilmesi için anahtarı kontrol edelim
+if os.getenv("GEMINI_API_KEY"):
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+else:
+    print("UYARI: Gemini servisi başlatılamadı, API anahtarı bulunamadı.", file=sys.stderr)
+
+# Hata almamak için daha verimli ve bu işe özel modeli seçiyoruz
+vision_model = genai.GenerativeModel('gemini-pro-vision')
+text_model = genai.GenerativeModel('gemini-pro')
+
+def analyze_image_style(image_bytes: bytes) -> dict:
+    \"\"\"Verilen resim dosyasının byte'larını analiz eder ve stil bilgilerini JSON olarak döndürür.\"\"\"
+    img = Image.open(io.BytesIO(image_bytes))
+    
+    prompt = \"\"\"
+    Bu resimdeki giysi veya mobilyayı analiz et. 
+    Bana aşağıdaki formatta bir JSON çıktısı ver:
+    {
+      "item_description": "Örnek: Lacivert, yünlü, slim-fit bir blazer ceket",
+      "style_tags": ["klasik", "minimalist", "ofis"],
+      "color_tags": ["lacivert", "koyu mavi", "mavi"]
+    }
+    Sadece ve sadece JSON kodunu döndür, başka hiçbir metin veya markdown formatı ekleme.
+    \"\"\"
+    response = vision_model.generate_content([prompt, img])
+    
+    # Gemini'den gelen yanıtı temizleyip JSON'a çevir
+    analysis_json_text = response.text.strip().replace("```json", "").replace("```", "")
+    return json.loads(analysis_json_text)
+
+def find_matching_products(analysis_data: dict, products_db: list) -> list:
+    \"\"\"Analiz verilerine göre ürün veritabanında eşleşen ürünleri bulur.\"\"\"
+    matched_products = []
+    style_tags = set(analysis_data.get("style_tags", []))
+    
+    for product in products_db:
+        product_style_tags = set(product.get("style_tags", []))
+        # Basit bir eşleştirme mantığı: En az bir stil etiketi eşleşiyorsa uyumlu kabul et
+        if style_tags.intersection(product_style_tags):
+            matched_products.append(product)
+    return matched_products
+
+def get_style_advice(description: str, matched_products: list) -> str:
+    \"\"\"Verilen ana parça ve uyumlu ürünler için Gemini'den stil önerisi metni alır.\"\"\"
+    style_prompt = f\"\"\"
+    Bir kullanıcı dolabındaki '{description}' için kombin önerisi arıyor.
+    Ona uyumlu olarak şu ürünleri bulduk: {[p['name'] for p in matched_products]}.
+    Bu ürünlerle ana parçanın neden şık duracağını anlatan, samimi ve ikna edici bir stil önerisi metni yaz.
+    Metin, kullanıcıya ilham vermeli ve bu ürünleri satın almaya teşvik etmeli.
+    \"\"\"
+    style_advice_response = text_model.generate_content(style_prompt)
+    return style_advice_response.text
+
+def get_chatbot_reply(user_message: str) -> str:
+    \"\"\"Kullanıcı mesajına göre iade asistanı chatbot'tan yanıt alır.\"\"\"
+    system_prompt = \"\"\"
+    Sen, 'StilDöngüsü' adlı bir e-ticaret sitesinin 'Akıllı İade Asistanı'sın. Adın 'ReturnLogic'. 
+    Görevin, müşterinin iade sebebini nazikçe anlamak ve mümkünse ona bir çözüm sunarak iadeyi engellemek.
+    - Eğer sorun beden veya renk/stil uyumsuzluğu ise, iadeyi başlatabileceğini söyle ama hemen ardından ona 'Stil ve Uyum Analisti (StyleSync)' özelliğimizi öner. Bu özelliğin, elindeki başka bir parçanın fotoğrafını yükleyerek ona %100 uyumlu ürünler bulabileceğini anlat. Müşteriyi ana sayfaya yönlendirmek için '[STIL_ANALISTI_LINK]' metnini kullan.
+    - Eğer ürün bozuksa veya farklı bir sorun varsa, üzgün olduğunu belirt ve iade sürecinin başlatılacağını söyle.
+    - Konuşmaların kısa, samimi ve çözüm odaklı olsun.
+    \"\"\"
+    response = text_model.generate_content([system_prompt, f"Müşteri: {user_message}"])
+    return response.text
+"""
+    },
+
+    "models": {
+        "chat_models.py": """from pydantic import BaseModel
+
+class ChatRequest(BaseModel):
+    message: str
+    product: str # Gelecekte kullanılabilir diye ekledik
+
+class ChatResponse(BaseModel):
+    reply: str
+"""
+    },
 
     "templates": {
         "layout.html": """<!DOCTYPE html>
@@ -202,13 +261,13 @@ if __name__ == '__main__':
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Stil Analisti</a>
+                        <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">Stil Analisti</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/siparislerim' %}active{% endif %}" href="/siparislerim">Siparişlerim</a>
+                        <a class="nav-link {% if request.url.path == '/siparislerim' %}active{% endif %}" href="/siparislerim">Siparişlerim</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if request.path == '/satici-paneli' %}active{% endif %}" href="/satici-paneli">Satıcı Paneli</a>
+                        <a class="nav-link {% if request.url.path == '/satici-paneli' %}active{% endif %}" href="/satici-paneli">Satıcı Paneli</a>
                     </li>
                 </ul>
             </div>
@@ -492,7 +551,8 @@ body {
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Bir hata oluştu.');
+                    // FastAPI hata mesajını 'detail' anahtarıyla gönderir
+                    throw new Error(data.detail || 'Bir hata oluştu.');
                 }
 
                 displayResults(data);
@@ -558,6 +618,7 @@ body {
             productName = event.relatedTarget.getAttribute('data-product-name');
             chatWindow.innerHTML = '';
             addMessageToChat(`Merhaba! \\"${productName}\\" ürününü iade etme sebebinizi kısaca öğrenebilir miyim?`, 'bot');
+            chatInput.value = ''; // Inputu temizle
         });
         
         // Gönder butonuna tıklandığında
@@ -566,6 +627,7 @@ body {
         // Enter'a basıldığında
         chatInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                e.preventDefault();
                 sendChatMessage();
             }
         });
@@ -586,9 +648,15 @@ body {
                     body: JSON.stringify({ message: message, product: productName })
                 });
                 const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Chatbot ile iletişim kurulamadı.');
+                }
+                
                 addMessageToChat(data.reply, 'bot');
+
             } catch (error) {
-                addMessageToChat('Üzgünüm, şu anda size yardımcı olamıyorum. Lütfen daha sonra tekrar deneyin.', 'bot');
+                addMessageToChat(`Üzgünüm, bir hata oluştu: ${error.message}. Lütfen daha sonra tekrar deneyin.`, 'bot');
             } finally {
                 document.getElementById('chat-typing-indicator').classList.add('d-none');
             }
@@ -614,6 +682,8 @@ body {
         },
         "img": {
             # Bu klasör boş oluşturulacak, siz resimlerinizi ekleyeceksiniz.
+            # Örnek resimleri buraya koyun: gomlek1.webp, pantolon1.webp, vb.
+            ".gitkeep": "" # Git'in boş klasörleri takip etmesi için
         }
     }
 }
@@ -641,11 +711,19 @@ def create_project_structure(base_path, structure):
 if __name__ == "__main__":
     current_directory = os.getcwd()
     print(f"Proje dosyaları şu konuma oluşturuluyor: {current_directory}")
+    print("-" * 30)
     create_project_structure(current_directory, PROJECT_STRUCTURE)
-    print("\nProje yapısı başarıyla oluşturuldu!")
-    print("\nSONRAKİ ADIMLAR:")
-    print("1. 'static/img/' klasörüne kendi ürün resimlerinizi ekleyin (örn: gomlek1.jpg).")
-    print("2. '.env' dosyasını açıp Gemini API anahtarınızı girin.")
-    print("3. Terminalde sanal ortamı kurup (`python -m venv venv`) aktif edin.")
-    print("4. Gerekli kütüphaneleri yükleyin (`pip install -r requirements.txt`).")
-    print("5. Projeyi başlatın (`flask run`).")
+    print("-" * 30)
+    print("\n✅ Proje yapısı başarıyla oluşturuldu!")
+    print("\n🚀 SONRAKİ ADIMLAR:")
+    print("1. 'static/img/' klasörüne kendi ürün resimlerinizi ekleyin (örn: gomlek1.webp).")
+    print("2. '.env' dosyasını açıp 'BURAYA_API_ANAHTARINIZI_YAPISTIRIN' yazan yere kendi Gemini API anahtarınızı girin.")
+    print("3. Terminalde bir sanal ortam oluşturup aktif edin:")
+    print("   python -m venv venv")
+    print("   # Windows için: .\\venv\\Scripts\\activate")
+    print("   # MacOS/Linux için: source venv/bin/activate")
+    print("4. Gerekli kütüphaneleri yükleyin:")
+    print("   pip install -r requirements.txt")
+    print("5. FastAPI sunucusunu başlatın:")
+    print("   uvicorn main:app --reload")
+    print("6. Tarayıcınızda http://127.0.0.1:8000 adresine gidin.")

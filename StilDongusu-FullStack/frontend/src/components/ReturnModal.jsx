@@ -10,7 +10,7 @@ const ReturnModal = ({ productName }) => {
 
     useEffect(() => {
         const modalElement = modalRef.current;
-        const handleShowModal = (event) => {
+        const handleShowModal = () => {
             if (productName) {
                 setMessages([{ text: `Merhaba! "${productName}" ürününü iade etme sebebinizi kısaca öğrenebilir miyim?`, sender: 'bot' }]);
                 setInput('');
@@ -41,7 +41,11 @@ const ReturnModal = ({ productName }) => {
                 message: input,
                 product: productName
             });
-            const botMessage = { text: response.data.reply, sender: 'bot' };
+            
+            // Gelen JSON'dan sadece metni alıyoruz
+            const botMessageText = response.data.reply_text;
+            const botMessage = { text: botMessageText, sender: 'bot' };
+            
             setMessages(prev => [...prev, userMessage, botMessage]);
         } catch (error) {
             const errorMessage = { text: 'Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin.', sender: 'bot' };

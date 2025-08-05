@@ -26,9 +26,7 @@ const HomePage = () => {
 
     try {
       const response = await axios.post('/api/analyze-style', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
       setResults(response.data);
     } catch (err) {
@@ -64,10 +62,8 @@ const HomePage = () => {
       </div>
       
       {loading && (
-        <div id="loading-spinner" className="text-center my-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
+        <div className="text-center my-5">
+          <div className="spinner-border text-primary" role="status"><span className="visually-hidden">Loading...</span></div>
           <p className="mt-2">Stiliniz analiz ediliyor... Gemini sizin için çalışıyor!</p>
         </div>
       )}
@@ -75,18 +71,32 @@ const HomePage = () => {
       {error && <div className="alert alert-danger mt-4">{error}</div>}
 
       {results && (
-        <div id="results-container" className="mt-5">
+        <div className="mt-5">
           <div className="mb-4">
             <div className="card style-advice-card">
               <div className="card-body">
-                <h5 className="card-title">✨ Gemini Stil Önerisi</h5>
-                <p className="card-text" dangerouslySetInnerHTML={{ __html: results.style_advice.replace(/\n/g, '<br>') }}></p>
-                <small className="text-muted">Bu öneri, <strong>{results.original_item.item_description}</strong> parçanıza göre özel olarak oluşturuldu.</small>
+                <h4 className="card-title text-center mb-3">✨ {results.style_advice.title} ✨</h4>
+                <p className="lead text-center">"{results.style_advice.vibe_description}"</p>
+                <hr/>
+                <h5 className="mt-4">Kombinasyon Mantığı</h5>
+                <p>{results.style_advice.combination_logic}</p>
+                <h5 className="mt-4">💡 Profesyonel İpucu (Pro-Tip)</h5>
+                <p className="fst-italic">{results.style_advice.pro_tip}</p>
+                <hr/>
+                 <details className="mt-3">
+                    <summary className="fw-bold" style={{cursor: 'pointer'}}>Yüklenen Görselin Detaylı Analizi</summary>
+                    <div className="mt-2 p-3 bg-light rounded">
+                        <p><strong>Açıklama:</strong> {results.image_analysis.item_description}</p>
+                        <p><strong>Stil Etiketleri:</strong> {results.image_analysis.inferred_style.style_tags.join(', ')}</p>
+                        <p><strong>Gerekçe:</strong> {results.image_analysis.inferred_style.justification}</p>
+                        <p><strong>Önerilen Kullanım:</strong> {results.image_analysis.contextual_use.seasons.join(', ')} mevsimlerinde, {results.image_analysis.contextual_use.environment.join('/')} ortamları için uygundur.</p>
+                    </div>
+                </details>
               </div>
             </div>
           </div>
           <hr className="my-5" />
-          <h3 className="text-center mb-4">Uyumlu Ürünler</h3>
+          <h3 className="text-center mb-4">Bu Stile Uyumlu Ürünler</h3>
           <div className="row">
             {results.matched_products.map((product) => (
               <div key={product.id} className="col-md-4 mb-4">

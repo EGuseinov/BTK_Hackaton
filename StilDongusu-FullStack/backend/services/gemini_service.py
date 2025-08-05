@@ -5,9 +5,12 @@ from PIL import Image
 import io
 import sys
 
+
 vision_model = None
 text_model = None
 is_configured = False
+
+# --- PROMPT'LAR ---
 
 PROMPT_ANALYZE_IMAGE = """
 SENARYO: Sen, dünya standartlarında bir moda ve iç mimari gurusu olan "Stil Gözü" adlı bir yapay zekasın. Görevin, sana sunulan görseli en ince detayına kadar analiz etmek ve tüm çıkarımlarını yapısal bir JSON formatında sunmaktır. Sadece JSON döndür, başka hiçbir açıklama yapma.
@@ -41,7 +44,10 @@ SÜREÇ:
 }}
 """
 
+# --- FONKSİYONLAR ---
+
 def configure_gemini(api_key: str):
+    
     global vision_model, text_model, is_configured
     try:
         genai.configure(api_key=api_key)
@@ -55,10 +61,12 @@ def configure_gemini(api_key: str):
         is_configured = False
 
 def parse_gemini_json_response(response_text: str) -> dict:
+    
     cleaned_text = response_text.strip().replace("```json", "").replace("```", "")
     return json.loads(cleaned_text)
 
 def analyze_image_style(image_bytes: bytes) -> dict:
+    """Verilen resim dosyasının byte'larını analiz eder ve stil bilgilerini JSON olarak döndürür."""
     if not is_configured:
         raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
     img = Image.open(io.BytesIO(image_bytes))
@@ -67,16 +75,31 @@ def analyze_image_style(image_bytes: bytes) -> dict:
     return parse_gemini_json_response(response.text)
 
 def find_matching_products(analysis_data: dict, products_db: list) -> list:
+    """
+    Analiz verilerine göre ürün veritabanında eşleşen ürünleri bulur.
+    Eğer eşleşme bulamazsa, genel öneri olarak ilk 3 ürünü döndürür.
+    """
     matched_products = []
-    style_tags = set(analysis_data.get("inferred_style", {}).get("style_tags", []))
+    inferred_style = analysis_data.get("inferred_style", {})
+    style_tags = set(inferred_style.get("style_tags", []))
     
+    if not style_tags:
+        print("Uyarı: Gemini analizinden stil etiketleri alınamadı. Genel öneriler döndürülüyor.")
+        return products_db[:3]
+
     for product in products_db:
         product_style_tags = set(product.get("style_tags", []))
         if style_tags.intersection(product_style_tags):
             matched_products.append(product)
+            
+    if not matched_products:
+        print("Uyarı: Spesifik eşleşme bulunamadı. Genel ürünler döndürülüyor.")
+        return products_db[:3]
+        
     return matched_products
 
 def get_style_advice(description: str, matched_products: list) -> dict:
+    """Verilen ana parça ve uyumlu ürünler için Gemini'den stil önerisi metni alır."""
     if not is_configured:
         raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
         
@@ -107,6 +130,7 @@ SÜREÇ:
     return parse_gemini_json_response(response.text)
 
 def get_chatbot_reply(user_message: str) -> dict:
+    """Kullanıcı mesajına göre iade asistanı chatbot'tan yanıt alır."""
     if not is_configured:
         raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
 

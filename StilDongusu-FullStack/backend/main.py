@@ -43,16 +43,16 @@ async def analyze_style_api(file: UploadFile = File(...)):
         image_bytes = await file.read()
         analysis_data = gemini_service.analyze_image_style(image_bytes)
         
+        
         matched_products = gemini_service.find_matching_products(analysis_data, products_db)
-        if not matched_products:
-             raise HTTPException(status_code=404, detail="Veritabanımızda bu stile uygun ürün bulamadık.")
+        
+        
         
         style_advice_data = gemini_service.get_style_advice(
             analysis_data.get('item_description'),
-            matched_products
+            matched_products 
         )
         
-        # Frontend'e her iki JSON'ı da gönderiyoruz.
         return {
             "image_analysis": analysis_data,
             "style_advice": style_advice_data,
@@ -62,12 +62,12 @@ async def analyze_style_api(file: UploadFile = File(...)):
         print(f"Sunucu Hatası: {e}", file=sys.stderr)
         raise HTTPException(status_code=500, detail=f"Analiz sırasında bir sunucu hatası oluştu: {str(e)}")
 
+
 @app.post("/api/chat")
 async def chat_api(chat_request: ChatRequest):
     if not API_KEY:
          raise HTTPException(status_code=500, detail="Sunucu yapılandırma hatası: Gemini API anahtarı bulunamadı.")
     try:
-        # Servis zaten JSON döndürdüğü için doğrudan onu yolluyoruz.
         reply_data = gemini_service.get_chatbot_reply(chat_request.message)
         return reply_data
     except Exception as e:

@@ -7,12 +7,20 @@
   --text-muted-color: #9e9e9e; /* Çok daha okunaklı bir gri */
 }
 
+html {
+  height: 100%;
+  overflow: hidden; 
+}
+
 body {
+  height: 100%; 
+  overflow-y: auto; 
+  overflow-x: hidden; 
   font-family: 'Poppins', sans-serif;
   background-color: var(--background-color);
   color: var(--text-color);
-  overflow-x: hidden;
 }
+
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
@@ -23,7 +31,6 @@ body {
   animation: fadeIn 0.5s ease-out forwards;
 }
 
-/* --- YAZI RENKLERİ DÜZELTMELERİ --- */
 .text-muted {
   color: var(--text-muted-color) !important;
 }
@@ -36,15 +43,11 @@ code {
   padding: 0.2em 0.4em;
   border-radius: 4px;
 }
-/* --- BİTİŞ --- */
 
-
-/* --- NAVBAR AYARLARI --- */
 .navbar {
   background-color: rgba(13, 12, 15, 0.8) !important;
   backdrop-filter: blur(10px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  /* YENİ EKLENEN KISIM: Navbar'ı inceltiyoruz */
   padding-top: 0.5rem;
   padding-bottom: 0.5rem;
 }
@@ -52,7 +55,6 @@ code {
 .navbar-brand, .nav-link {
   color: var(--text-color) !important;
   transition: color 0.3s ease;
-  /* YENİ EKLENEN KISIM: Linklerin dikey boşluğunu azaltıyoruz */
   padding-top: 0.25rem !important;
   padding-bottom: 0.25rem !important;
 }
@@ -65,7 +67,6 @@ code {
 .nav-link.active, .nav-link:hover {
   color: var(--primary-color) !important;
 }
-/* --- BİTİŞ --- */
 
 .form-control {
   background-color: var(--surface-color);
@@ -78,6 +79,11 @@ code {
   color: var(--text-color);
   box-shadow: 0 0 15px var(--glow-color);
   border-color: var(--primary-color);
+}
+
+.form-control::placeholder {
+  color: var(--text-muted-color);
+  opacity: 0.7;
 }
 
 .futuristic-card {
@@ -161,8 +167,21 @@ details > div {
   border: 1px solid var(--primary-color);
 }
 
+/* 
+  THIS IS THE PRIMARY FIX: 
+  It forces the modal's z-index to be higher than the backdrop,
+  preventing the backdrop from intercepting mouse clicks.
+*/
+.modal {
+  z-index: 1060 !important;
+}
+
+.btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
 .chat-window {
-    height: 350px;
+    height: 250px;
     display: flex;
     flex-direction: column;
     padding: 10px;

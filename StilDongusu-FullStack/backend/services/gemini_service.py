@@ -1,3 +1,5 @@
+# gemini_service.py
+
 import os
 import json
 import google.generativeai as genai
@@ -15,13 +17,6 @@ is_configured = False
 PROMPT_ANALYZE_IMAGE = """
 SENARYO: Sen, dünya standartlarında bir moda ve iç mimari gurusu olan "Stil Gözü" adlı bir yapay zekasın. Görevin, sana sunulan görseli en ince detayına kadar analiz etmek ve tüm çıkarımlarını yapısal bir JSON formatında sunmaktır. Sadece JSON döndür, başka hiçbir açıklama yapma.
 
-SÜREÇ:
-1.  **Kategori Tespiti:** Görseldeki ana obje bir 'giyim' ürünü mü yoksa bir 'mobilya' mı?
-2.  **Detaylı Analiz:** Objeyi rengi, dokusu (tahmini), deseni, kesimi ve materyali (tahmini) gibi görsel özellikleriyle tanımla.
-3.  **Stil Çıkarımı:** Bu görsel özelliklere dayanarak, objenin estetik stilini (ör: bohem, minimalist, endüstriyel, avangart, klasik, spor) belirle. Birden fazla etiket kullanabilirsin.
-4.  **Bağlamsal Çıkarım:** Bu parçanın hangi mevsimde, ne tür bir ortamda (günlük, ofis, özel davet) ve hangi resmiyet düzeyinde (rahat, yarı-resmi, resmi) kullanılabileceğini tahmin et.
-5.  **Gerekçelendirme:** Stil etiketlerini neden seçtiğine dair kısa, profesyonel bir gerekçe sun.
-
 İSTENEN JSON FORMATI:
 {{
   "category": "(giyim/mobilya)",
@@ -34,7 +29,7 @@ SÜREÇ:
   }},
   "inferred_style": {{
     "style_tags": ["ana stil etiketi", "ikincil stil etiketi"],
-    "justification": "Bu stil etiketlerini seçme sebebini açıklayan kısa metin. Örn: 'Geniş paça kesimi ve yıpratılmış dokusu 70'ler bohem akımını, sade rengi ise minimalist estetiği yansıtıyor.'"
+    "justification": "Bu stil etiketlerini seçme sebebini açıklayan kısa metin."
   }},
   "contextual_use": {{
     "seasons": ["ilkbahar", "yaz"],
@@ -44,10 +39,50 @@ SÜREÇ:
 }}
 """
 
+# GÜNCELLENDİ: Stil Radarı Prompt'u daha katı hale getirildi
+PROMPT_CREATE_STYLE_PROFILE = """
+SENARYO: Sen, birden fazla görseldeki desenleri, renkleri ve kesimleri analiz edip bir kişinin bütünsel stil kimliğini ortaya çıkaran bir stil analistisin. Sana sunulan görsellerdeki ortak temaları belirleyerek kişinin stil profilini, renk tercihlerini ve genel bir özetini bir JSON nesnesi olarak döndür. Stilleri yüzdelik olarak ifade et ve toplamları 100 olmalı. Kesinlikle sadece JSON çıktısı ver, başka hiçbir açıklama veya giriş metni ekleme.
+
+İSTENEN JSON FORMATI:
+{{
+  "style_profile": [
+    {{"style": "bohem", "percentage": 60}},
+    {{"style": "klasik", "percentage": 30}},
+    {{"style": "sokak_modasi", "percentage": 10}}
+  ],
+  "dominant_colors": ["toprak tonları", "denim mavisi", "krem"],
+  "summary": "Bu kişi, rahatlığı ön planda tutan, doğal kumaşları ve salaş kesimleri benimseyen bir bohem tarza sahip. Ancak dolabındaki blazer ceketler ve düz renk gömlekler, klasik parçalara da önem verdiğini gösteriyor."
+}}
+"""
+
+PROMPT_GENERATE_VISUAL_COMBO = """
+SENARYO: Sen, bir stilistin hayal gücünü metne döken bir betimleme uzmanısın. Sana verilen kıyafetleri giyen bir mankeni, bir e-ticaret sitesinin stüdyo çekimindeymiş gibi detaylıca betimle. Sadece JSON formatında cevap ver.
+
+GİRDİLER:
+- Ana Parça: {main_item}
+- Uyumlu Ürünler: {matched_items}
+
+İSTENEN JSON FORMATI:
+{{
+  "image_description": "Fotorealistik bir manken fotoğrafının detaylı açıklaması. Örn: 'Sade, gri bir stüdyo arka planının önünde duran manken, [ana parça açıklaması]'nı giyiyor. Üzerine [ürün 1 adı]'nı kombinlemiş ve ayakkabı olarak [ürün 2 adı] tercih etmiş. Duruşu kendinden emin ve modern bir hava katıyor.'"
+}}
+"""
+
+PROMPT_STRATEGIC_RETURN_ADVICE = """
+SENARYO: Sen bir e-ticaret veri analistisin. Sana bir ürünle ilgili bir grup müşteri iade mesajı verilecek. Bu mesajları analiz et, tekrar eden ana temayı (ör: 'kalıp dar', 'renk soluk', 'kumaş ince') bul ve satıcının iade oranını düşürmek için ürün sayfasına ekleyebileceği somut, aksiyon odaklı bir öneri metni oluştur. Sadece JSON formatında cevap ver.
+
+Müşteri Mesajları: {messages}
+
+İSTENEN JSON FORMATI:
+{{
+  "common_theme": "Müşteriler sıklıkla ürünün kalıbının beklenenden dar olduğundan şikayetçi.",
+  "actionable_advice": "Ürün açıklamasına şu notu eklemeyi düşünün: 'Stil Notu: Bu ürün, vücuda oturan slim-fit bir kesime sahiptir. Daha rahat bir kullanım için bir beden büyük tercih etmenizi öneririz.'"
+}}
+"""
+
 # --- FONKSİYONLAR ---
 
 def configure_gemini(api_key: str):
-    
     global vision_model, text_model, is_configured
     try:
         genai.configure(api_key=api_key)
@@ -60,109 +95,120 @@ def configure_gemini(api_key: str):
         print(f"HATA: Gemini servisi yapılandırılamadı: {e}", file=sys.stderr)
         is_configured = False
 
+# YENİ: Daha akıllı JSON ayrıştırıcı fonksiyon
 def parse_gemini_json_response(response_text: str) -> dict:
-    
-    cleaned_text = response_text.strip().replace("```json", "").replace("```", "")
-    return json.loads(cleaned_text)
+    """
+    Gemini'den gelen metin yanıtından JSON bloğunu ayıklar ve ayrıştırır.
+    Yanıtın başında veya sonunda fazladan metin olsa bile çalışacak şekilde tasarlanmıştır.
+    """
+    try:
+        # JSON bloğunun başlangıcını '{' ve sonunu '}' karakteriyle bul
+        json_start_index = response_text.find('{')
+        json_end_index = response_text.rfind('}')
+
+        if json_start_index == -1 or json_end_index == -1:
+            raise ValueError("Yanıt metninde JSON nesnesi bulunamadı.")
+
+        # Sadece JSON bloğunu al ve ayrıştır
+        json_string = response_text[json_start_index : json_end_index + 1]
+        return json.loads(json_string)
+        
+    except (json.JSONDecodeError, ValueError) as e:
+        print(f"JSON Ayrıştırma Hatası: {e}\n--- Sorunlu Orijinal Metin Başlangıcı ---\n{response_text[:500]}...\n--- Sorunlu Orijinal Metin Sonu ---", file=sys.stderr)
+        raise ValueError("Gemini'den gelen yanıt geçerli bir JSON formatı içermiyor.")
 
 def analyze_image_style(image_bytes: bytes) -> dict:
-    """Verilen resim dosyasının byte'larını analiz eder ve stil bilgilerini JSON olarak döndürür."""
     if not is_configured:
-        raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
+        raise Exception("Gemini servisi yapılandırılmamış.")
     img = Image.open(io.BytesIO(image_bytes))
-    
     response = vision_model.generate_content([PROMPT_ANALYZE_IMAGE, img])
     return parse_gemini_json_response(response.text)
 
 def find_matching_products(analysis_data: dict, products_db: list) -> list:
-    """
-    Analiz verilerine göre ürün veritabanında eşleşen ürünleri bulur.
-    Eğer eşleşme bulamazsa, genel öneri olarak ilk 3 ürünü döndürür.
-    """
     matched_products = []
     inferred_style = analysis_data.get("inferred_style", {})
     style_tags = set(inferred_style.get("style_tags", []))
-    
     if not style_tags:
-        print("Uyarı: Gemini analizinden stil etiketleri alınamadı. Genel öneriler döndürülüyor.")
         return products_db[:3]
-
     for product in products_db:
         product_style_tags = set(product.get("style_tags", []))
         if style_tags.intersection(product_style_tags):
             matched_products.append(product)
-            
     if not matched_products:
-        print("Uyarı: Spesifik eşleşme bulunamadı. Genel ürünler döndürülüyor.")
         return products_db[:3]
-        
     return matched_products
 
 def get_style_advice(description: str, matched_products: list) -> dict:
-    """Verilen ana parça ve uyumlu ürünler için Gemini'den stil önerisi metni alır."""
     if not is_configured:
-        raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
-        
+        raise Exception("Gemini servisi yapılandırılmamış.")
     matched_products_names = [p['name'] for p in matched_products]
-    
     PROMPT_GET_STYLE_ADVICE = f"""
 SENARYO: Sen, kullanıcılarına ilham veren, sıcak ve bilgili bir stil danışmanı olan "StilDöngüsü Asistanı"sın. Senin işin sadece neyin neyle uyduğunu söylemek değil, bir hikaye anlatmak ve kullanıcıyı heyecanlandırmaktır. Cevabını sadece JSON formatında ver.
-
 GİRDİLER:
 - Ana Parça Tanımı: {description}
 - Uyumlu Ürünler Listesi: {matched_products_names}
-
-SÜREÇ:
-1.  **Vibe Yarat:** Ana parça ve uyumlu ürünlerin bir araya geldiğinde yaratacağı genel havayı (vibe) tanımla. "Sofistike ve modern", "enerjik ve bohem", "sakin ve profesyonel" gibi.
-2.  **Kombin Mantığını Açıkla:** Renk teorisi, doku kontrastı veya stil dengesi gibi profesyonel kavramları basit bir dille kullanarak bu parçaların neden birlikte "çalıştığını" açıkla.
-3.  **Profesyonel İpucu (Pro-Tip):** Bu kombini bir üst seviyeye taşıyacak küçük bir aksesuar, ayakkabı seçimi veya kullanım önerisi ekle. Bu senin imzan olsun.
-4.  **Başlık Oluştur:** Kombine "Hafta Sonu Şıklığı", "Ofiste Güç Duruşu" gibi akılda kalıcı bir başlık bul.
-
 İSTENEN JSON FORMATI:
 {{
     "title": "Kombin için yaratıcı ve akılda kalıcı başlık",
     "vibe_description": "Bu kombinin genel atmosferini ve hissini anlatan 1-2 cümlelik metin.",
     "combination_logic": "Parçaların neden uyumlu olduğunu açıklayan detaylı stil analizi metni.",
-    "pro_tip": "Kombini tamamlayacak uzman ipucu. Örn: 'Bu kombini metalik bir kolye ile tamamlayarak modern bir dokunuş katabilirsiniz.'"
+    "pro_tip": "Kombini tamamlayacak uzman ipucu."
 }}
 """
     response = text_model.generate_content(PROMPT_GET_STYLE_ADVICE)
     return parse_gemini_json_response(response.text)
 
+
 def get_chatbot_reply(user_message: str) -> dict:
-    """Kullanıcı mesajına göre iade asistanı chatbot'tan yanıt alır."""
     if not is_configured:
-        raise Exception("Gemini servisi yapılandırılmamış veya anahtar geçersiz.")
-
+        raise Exception("Gemini servisi yapılandırılmamış.")
     PROMPT_CHATBOT_BRAIN = f"""
-SENARYO: Sen, bir e-ticaret firmasının en değerli çalışanı olan "ReturnLogic" adlı bir Müşteri Memnuniyeti Yapay Zeka Uzmanısın. Sadece bir chatbot değilsin; empatik, analitik ve çözüm odaklısın. Birincil hedefin, müşteriyi mutlu ederek iadeyi önlemek ve onu tekrar alışveriş döngüsüne dahil etmektir. Her yanıtını yapısal bir JSON formatında ver.
-
+SENARYO: Sen, bir e-ticaret firmasının "ReturnLogic" adlı Müşteri Memnuniyeti Uzmanısın. Empatik, analitik ve çözüm odaklısın. Birincil hedefin, müşteriyi mutlu ederek iadeyi önlemek. Her yanıtını yapısal bir JSON formatında ver.
 SÜREÇ:
-1.  **Empati Kur:** Her zaman müşterinin hayal kırıklığını anladığını belirten kısa bir cümleyle başla.
-2.  **Niyet Tespiti (Intent Recognition):** Müşterinin mesajının altında yatan asıl iade sebebini şu kategorilerden birine ata:
-    - `BEDEN`: 'büyük/küçük geldi', 'dar/bol oldu', 'kalıbı uymadı' gibi ifadeler.
-    - `RENK_STIL`: 'rengini beğenmedim', 'bana yakışmadı', 'resimdeki gibi durmadı' gibi estetik ifadeler.
-    - `KUSURLU_URUN`: 'yırtık', 'bozuk', 'lekeli', 'kırık geldi' gibi bariz ürün hataları.
-    - `BEKLENTI_FARKI`: 'kumaşı kaliteli değil', 'ince zannetmiştim kalın çıktı' gibi ürünün kendisiyle ilgili hayal kırıklıkları.
-    - `COZULEBILIR_SORUN`: 'kurulumunu yapamadım', 'ayarı nasıl oluyor?' gibi bilgi eksikliğine dayalı sorunlar.
-    - `BELIRSIZ`: 'beğenmedim', 'iade etmek istiyorum' gibi genel ifadeler.
-3.  **Aksiyona Yönelik Cevap Üret:** Tespit ettiğin niyete göre en uygun çözümü sunan bir metin oluştur.
-    - `BEDEN` veya `RENK_STIL` ise: Değişim teklif et ve ASIL ÖNEMLİSİ, bir sonraki sefer mükemmel ürünü bulması için "Stil Analisti (StyleSync)" özelliğini heyecan verici bir şekilde tanıt. '[STIL_ANALISTI_LINK]' anahtar kelimesini kullan.
-    - `KUSURLU_URUN` ise: Koşulsuz şartsız özür dile, hemen yeni ürün göndermeyi veya tam iade yapmayı teklif et. Güveni yeniden inşa et.
-    - `BEKLENTI_FARKI` ise: Üzüntünü belirt, iade alabileceğini söyle. Gelecekte daha doğru seçimler yapabilmesi için ürün açıklamalarını daha dikkatli okumasını veya müşteri yorumlarından faydalanmasını nazikçe öner.
-    - `COZULEBILIR_SORUN` ise: Sorunu anında çözmeye yönelik basit bir talimat veya link ver. "Ayarlar menüsünde..." gibi.
-    - `BELIRSIZ` ise: Daha fazla bilgi almak için nazikçe bir soru sor. "Elbette yardımcı olmak isterim, sakıncası yoksa beğenmeme sebebinizle ilgili biraz daha detay verebilir misiniz? Belki size daha uygun bir ürün önerebilirim."
-4.  **JSON Çıktısı Oluştur:** Analizini ve oluşturduğun cevabı JSON formatında paketle.
-
+1.  **Empati Kur:** Müşterinin hayal kırıklığını anladığını belirten bir cümleyle başla.
+2.  **Niyet Tespiti (Intent):** Müşterinin mesajının altında yatan asıl iade sebebini şu kategorilerden birine ata: `BEDEN`, `RENK_STIL`, `KUSURLU_URUN`, `BEKLENTI_FARKI`, `COZULEBILIR_SORUN`, `BELIRSIZ`.
+3.  **Aksiyona Yönelik Cevap Üret:** Tespit ettiğin niyete göre en uygun çözümü sunan bir metin oluştur. `BEDEN` veya `RENK_STIL` ise, değişim teklif et ve "Stil Analisti" özelliğini '[STIL_ANALISTI_LINK]' anahtar kelimesiyle tanıt.
+4.  **JSON Çıktısı Oluştur.**
 GİRDİ:
 - Müşteri Mesajı: {user_message}
-
 İSTENEN JSON FORMATI:
 {{
   "detected_intent": "Tespit ettiğin niyet kategorisi (örn: BEDEN, RENK_STIL)",
   "reply_text": "Müşteriye gösterilecek, yukarıdaki kurallara göre oluşturulmuş yanıt metni.",
-  "is_return_prevented": "Bu cevapla iadenin önlenme potansiyeli var mı? (true/false)"
+  "is_return_prevented": true
 }}
 """
     response = text_model.generate_content(PROMPT_CHATBOT_BRAIN)
+    return parse_gemini_json_response(response.text)
+
+def create_style_profile(image_bytes_list: list) -> dict:
+    if not is_configured:
+        raise Exception("Gemini servisi yapılandırılmamış.")
+    
+    prompt_parts = [PROMPT_CREATE_STYLE_PROFILE]
+    for image_bytes in image_bytes_list:
+        img = Image.open(io.BytesIO(image_bytes))
+        prompt_parts.append(img)
+        
+    response = vision_model.generate_content(prompt_parts)
+    return parse_gemini_json_response(response.text)
+
+
+def generate_visual_combo(main_item: str, matched_items: list) -> dict:
+    if not is_configured:
+        raise Exception("Gemini servisi yapılandırılmamış.")
+    
+    prompt = PROMPT_GENERATE_VISUAL_COMBO.format(
+        main_item=main_item, 
+        matched_items=", ".join(matched_items)
+    )
+    response = text_model.generate_content(prompt)
+    return parse_gemini_json_response(response.text)
+
+def get_strategic_return_advice(messages: list) -> dict:
+    if not is_configured:
+        raise Exception("Gemini servisi yapılandırılmamış.")
+    
+    prompt = PROMPT_STRATEGIC_RETURN_ADVICE.format(messages=json.dumps(messages, ensure_ascii=False))
+    response = text_model.generate_content(prompt)
     return parse_gemini_json_response(response.text)

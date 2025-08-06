@@ -4,79 +4,109 @@
         "name": "Bej Keten Gömlek",
         "price": "899.99 TL",
         "image": "static/img/gomlek1.webp",
-        "style_tags": ["bohem", "klasik", "minimalist", "günlük", "rahat", "doğal", "sade", "yazlık", "sahil", "hafif", "casual"],
-        "color_tags": ["bej", "krem", "toprak", "açık kahve", "naturel"]
+        "style_tags": ["bohem", "klasik", "minimalist", "günlük", "rahat"],
+        "color_tags": ["bej", "krem", "toprak"],
+        "cut_style": "düz kesim",
+        "material": "keten",
+        "uygun_vucut_tipleri": ["dikdörtgen", "elma", "kum saati"]
     },
     {
         "id": 2,
         "name": "Siyah Chino Pantolon",
         "price": "1299.90 TL",
         "image": "static/img/pantolon1.webp",
-        "style_tags": ["klasik", "modern", "ofis", "minimalist", "yarı-resmi", "smart-casual", "şehirli", "zamansız", "temel parça"],
-        "color_tags": ["siyah", "antrasit", "koyu", "füme", "karbon"]
+        "style_tags": ["klasik", "modern", "ofis", "minimalist", "smart-casual"],
+        "color_tags": ["siyah", "antrasit"],
+        "cut_style": "dar paça",
+        "material": "pamuk gabardin",
+        "uygun_vucut_tipleri": ["kum saati", "dikdörtgen"]
     },
     {
         "id": 3,
         "name": "Beyaz Deri Sneaker",
         "price": "2499.00 TL",
         "image": "static/img/ayakkabi1.jpeg",
-        "style_tags": ["spor", "günlük", "modern", "minimalist", "şehirli", "rahat", "casual", "sokak modası", "temel parça", "konforlu"],
-        "color_tags": ["beyaz", "krem", "kirli beyaz", "optik beyaz"]
+        "style_tags": ["spor", "günlük", "modern", "minimalist", "şehirli"],
+        "color_tags": ["beyaz", "krem"],
+        "cut_style": "klasik sneaker",
+        "material": "deri",
+        "uygun_vucut_tipleri": ["tümü"]
     },
     {
         "id": 4,
         "name": "Zümrüt Yeşili Saten Elbise",
         "price": "1899.50 TL",
         "image": "static/img/elbise1.jpeg",
-        "style_tags": ["şık", "gece", "özel gün", "klasik", "feminen", "resmi", "davet", "lüks", "akşam", "zarif", "avangart"],
-        "color_tags": ["yeşil", "zümrüt", "koyu yeşil", "çam yeşili", "parlak yeşil"]
+        "style_tags": ["şık", "gece", "özel gün", "klasik", "feminen", "davet"],
+        "color_tags": ["yeşil", "zümrüt"],
+        "cut_style": "A-kesim",
+        "material": "saten",
+        "uygun_vucut_tipleri": ["armut", "kum saati", "dikdörtgen"]
     },
     {
         "id": 5,
         "name": "Gri Oversize Hoodie",
         "price": "1450.00 TL",
         "image": "static/img/hoodie1.webp",
-        "style_tags": ["spor", "sokak modası", "rahat", "günlük", "konforlu", "oversize", "modern", "casual", "genç"],
-        "color_tags": ["gri", "antrasit", "açık gri", "melanj gri", "kül rengi"]
+        "style_tags": ["spor", "sokak modası", "rahat", "günlük", "oversize"],
+        "color_tags": ["gri", "antrasit"],
+        "cut_style": "oversize",
+        "material": "pamuk",
+        "uygun_vucut_tipleri": ["elma", "dikdörtgen", "tümü"]
     },
     {
         "id": 6,
         "name": "Endüstriyel Tarz Metal Kitaplık",
         "price": "3200.00 TL",
         "image": "static/img/kitaplik1.jpeg",
-        "style_tags": ["endüstriyel", "modern", "minimalist", "şehirli", "loft", "rustik", "fonksiyonel", "dekoratif"],
-        "color_tags": ["siyah", "metal", "antrasit", "ahşap", "koyu kahve"]
+        "style_tags": ["endüstriyel", "modern", "minimalist"],
+        "color_tags": ["siyah", "metal", "ahşap"],
+        "cut_style": "endüstriyel",
+        "material": "metal ve ahşap",
+        "uygun_vucut_tipleri": []
     },
     {
         "id": 7,
         "name": "Mavi Yıpratmalı Mom Jean",
         "price": "1699.00 TL",
         "image": "static/img/jean1.webp",
-        "style_tags": ["retro", "90lar", "vintage", "günlük", "rahat", "sokak modası", "bohem", "casual", "mom-fit"],
-        "color_tags": ["mavi", "açık mavi", "denim", "indigo", "taşlanmış"]
+        "style_tags": ["retro", "90lar", "vintage", "günlük", "rahat", "sokak modası"],
+        "color_tags": ["mavi", "denim"],
+        "cut_style": "mom-fit",
+        "material": "denim",
+        "uygun_vucut_tipleri": ["kum saati", "armut"]
     },
     {
         "id": 8,
         "name": "Hardal Sarısı Kadife Berjer",
         "price": "5800.00 TL",
         "image": "static/img/berjer1.jpeg",
-        "style_tags": ["retro", "vintage", "orta-yüzyıl modern", "bohem", "şık", "konforlu", "dekoratif", "klasik"],
-        "color_tags": ["sarı", "hardal", "altın", "toprak", "sıcak renk"]
+        "style_tags": ["retro", "vintage", "bohem", "şık"],
+        "color_tags": ["sarı", "hardal", "altın"],
+        "cut_style": "orta-yüzyıl modern",
+        "material": "kadife",
+        "uygun_vucut_tipleri": []
     },
     {
         "id": 9,
         "name": "Deri Biker Ceket",
         "price": "4500.00 TL",
         "image": "static/img/ceket1.webp",
-        "style_tags": ["rock", "punk", "modern", "şehirli", "sokak modası", "zamansız", "asi", "motorcu", "biker"],
-        "color_tags": ["siyah", "antrasit", "koyu", "deri"]
+        "style_tags": ["rock", "modern", "şehirli", "sokak modası", "zamansız"],
+        "color_tags": ["siyah", "deri"],
+        "cut_style": "biker",
+        "material": "deri",
+        "uygun_vucut_tipleri": ["dikdörtgen", "kum saati", "elma"]
     },
     {
         "id": 10,
         "name": "Çiçek Desenli Maxi Elbise",
         "price": "2100.00 TL",
         "image": "static/img/maxielbise1.webp",
-        "style_tags": ["bohem", "romantik", "yazlık", "günlük", "feminen", "rahat", "doğal", "kır düğünü", "tatil"],
-        "color_tags": ["beyaz", "pembe", "yeşil", "renkli", "pastel"]
+        "style_tags": ["bohem", "romantik", "yazlık", "feminen", "rahat"],
+        "color_tags": ["beyaz", "pembe", "yeşil"],
+        "cut_style": "beli lastikli maxi",
+        "material": "viskon",
+        "uygun_vucut_tipleri": ["tümü"]
     }
 ]

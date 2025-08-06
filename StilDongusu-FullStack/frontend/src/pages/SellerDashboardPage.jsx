@@ -1,5 +1,3 @@
-// SellerDashboardPage.jsx
-
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
@@ -20,7 +18,6 @@ const SellerDashboardPage = () => {
     useEffect(() => {
         const fetchAnalytics = async () => {
             try {
-                setLoading(true);
                 const response = await axios.get('/api/return-analytics');
                 setAnalytics(response.data);
                 setError('');
@@ -31,20 +28,14 @@ const SellerDashboardPage = () => {
                 setLoading(false);
             }
         };
-
         fetchAnalytics();
-        
-        // Verilerin her 30 saniyede bir güncellenmesi için bir interval (isteğe bağlı)
-        const intervalId = setInterval(fetchAnalytics, 30000);
-        return () => clearInterval(intervalId);
-
     }, []);
 
     return (
         <div className="fade-in">
             <h1 className="display-5 fw-bold text-center mb-3">Stratejik İade Analiz Raporu</h1>
             <p className="lead text-muted text-center mb-5">
-              Bu rapor, <strong>Gemini</strong> tarafından iade konuşmaları analiz edilerek gerçek zamanlı olarak oluşturulmuştur.
+              Bu rapor, <strong>Gemini</strong> tarafından satış, arama ve iade verileri analiz edilerek gerçek zamanlı olarak oluşturulmuştur.
             </p>
 
             {loading && <div className="text-center"><div className="pulsing-loader"></div><p className="mt-3">Analiz Raporu Yükleniyor...</p></div>}
@@ -52,9 +43,29 @@ const SellerDashboardPage = () => {
             
             {analytics && (
                 <>
+                {analytics.strategic_overview && (
+                    <div className="futuristic-card mb-4">
+                        <h4 className="mb-3">📈 Gemini Stratejik Öngörü Raporu</h4>
+                        <div className="row">
+                            <div className="col-md-4 mb-3 mb-md-0">
+                                <h6 className="text-warning">Trend Alarmı</h6>
+                                <p>{analytics.strategic_overview.trend_alarm}</p>
+                            </div>
+                            <div className="col-md-4 mb-3 mb-md-0">
+                                <h6 className="text-info">Stok Optimizasyonu</h6>
+                                <p>{analytics.strategic_overview.stock_optimization}</p>
+                            </div>
+                            <div className="col-md-4">
+                                <h6 className="text-success">Ürün Geliştirme</h6>
+                                <p>{analytics.strategic_overview.product_development}</p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                
                 {analytics.total_returns > 0 ? (
                     <div className="futuristic-card">
-                        <h4 className="mb-4">Ürün Bazlı Stratejik Öneriler</h4>
+                        <h4 className="mb-4">Ürün Bazlı Detaylı İade Analizi</h4>
                         <p className="text-muted">Toplam İade Sayısı: {analytics.total_returns}</p>
                         <div className="accordion accordion-flush" id="reportAccordion">
                             {analytics.product_analysis.map((product, index) => (
@@ -67,11 +78,6 @@ const SellerDashboardPage = () => {
                                     </h2>
                                     <div id={`collapse-${index}`} className="accordion-collapse collapse" data-bs-parent="#reportAccordion">
                                         <div className="accordion-body border-top border-secondary border-opacity-25">
-                                            <h5>Gemini'nin Stratejik Analizi:</h5>
-                                            <p><strong>Tespit Edilen Ana Tema:</strong> {product.strategic_advice.common_theme}</p>
-                                            <p className="mb-1"><strong>Aksiyon Önerisi:</strong></p>
-                                            <code className="d-block bg-dark p-2 rounded mb-4">{product.strategic_advice.actionable_advice}</code>
-                                            
                                             <h5>Detaylı İade Nedenleri:</h5>
                                             {product.reasons.map(reason => (
                                                 <div key={reason.intent}>
